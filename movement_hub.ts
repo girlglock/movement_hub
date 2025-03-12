@@ -690,7 +690,7 @@ let hud = {
 
         const timeText = timerStopped
             ? [`CPs: ${checkpoints.cpNum}`, `TPs: ${checkpoints.tpNum}`]
-            : [`Time: ${utils.formatTime(timerTicks)}`, `${currentMode !== "HappyFrenzy" ? `Segmented: ${utils.formatTime(segmentedTimerTicks + segmentedTimerTicksTotal)}` : `SteamHappies: ${steamhappies}/${mapInfo.maxStages}`}`];
+            : [`Time: ${utils.formatTime(timerTicks)}`, `${currentMode !== "HappyFrenzy" ? `Segmented: ${utils.formatTime(segmentedTimerTicks + segmentedTimerTicksTotal)}` : `SteamHappies: ${steamhappies}/${mapInfo.steamHappies}`}`];
         Instance.DebugScreenText(utils.padString(timeText[0]), 7, 130 * heightMultiplier + 2, 0, 0, color);
         Instance.DebugScreenText(utils.padString(timeText[1]), 7, 140 * heightMultiplier + 4, 0, 0, color);
 
