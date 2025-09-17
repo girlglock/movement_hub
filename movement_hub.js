@@ -27,7 +27,7 @@ const nerdStuff = {
     deg: 57.2957795,
     maxInt: 2147483647,
     oneTick: 0.015625,
-    nullV: { x: 16000, y: 16000, z: 16000 }
+    nullV: null
 };
 
 const chatcolors = {
@@ -185,14 +185,12 @@ let server = {
 
         // Handle first Spawn
         if (!server.firstSetup && server.currentTick > 175) {
-            Instance.Msg("first spawn");
             server.randomHashPW = utils.generateRandomHash().toString();
             server.sendCommand(`sv_radio_throttle_window 0; sv_disable_teamselect_menu 0; snd_toolvolume 0.025; noclip_fixup 0;game_alias comp;`);
 
             server.entFire("end_s*", "addoutput", `OnStartTouch>kz_script>RunScriptInput>on_trial_stage_finish>0>-1`);
             server.entFire("collected_s*", "addoutput", `OnStartTouch>kz_script>RunScriptInput>on_trial_alt_collect>0>-1`);
             server.entFire("finish_s" + config.mapInfo[server.currentMapName].maxStages, "addoutput", `OnStartTouch>kz_script>RunScriptInput>on_trial_finish>0>-1`);
-            Instance.Msg(server.date.getMonth().toString());
             switch (server.date.getMonth()) {
                 case 5:
                     server.sendCommand(`ent_create info_particle_system {"targetname" "festive_pride" "origin" "0 0 0" "angles" "0 0 0" "effect_name" "particles/hud/festive_pride.vpcf" "start_active" "True"}`, 1);
@@ -200,8 +198,6 @@ let server = {
                 default:
                     break;
             }
-
-            Instance.Msg("first spawn 3");
 
             for (let i = 0; i <= 9; i++) {
                 server.sendCommand(`ent_create info_particle_system {"targetname" "veloMsg1_${i}" "origin" "0 0 0" "angles" "0 0 0" "effect_name" "particles/hud/velo/velo1_${i}.vpcf" "start_active" "False"}`, nerdStuff.oneTick * i);
@@ -213,24 +209,16 @@ let server = {
                 server.sendCommand(`ent_create info_particle_system {"targetname" "veloMsg3pre_${i}" "origin" "0 0 0" "angles" "0 0 0" "effect_name" "particles/hud/velo/pre_velo3_${i}.vpcf" "start_active" "False"}`, nerdStuff.oneTick * i);
             }
 
-            Instance.Msg("first spawn 4");
-
-            server.sendCommand("ent_fire loadscreen destroyimmediately", nerdStuff.oneTick * 10);
-            server.sendCommand("jointeam 2 1", nerdStuff.oneTick * 10);
+            Instance.SetThink(() => {
+                player.playerController.JoinTeam(2);
+                server.sendCommand("ent_fire loadscreen destroyimmediately", nerdStuff.oneTick * 10);
+            });
+            Instance.SetNextThink(Instance.GetGameTime() + nerdStuff.oneTick * 10);
             server.firstSetup = true;
         }
 
-        // Handle ResetVelo and disallow noclip
-        if (server.currentTick === server.allowVeloTick || server.currentTick === server.disallowVeloTick) {
-            if (server.currentTick === server.allowVeloTick) {
-                player.allowTrail = true;
-                server.sendCommand("sv_noclipaccelerate 5; sv_noclipspeed 1200; sv_maxvelocity 3500; noclip 0");
-            } else {
-                player.allowTrail = false;
-                server.sendCommand("sv_noclipaccelerate 0; sv_noclipspeed 0; sv_maxvelocity -0.75; noclip 1");
-            }
-        }
-        else if (server.currentTick > server.disallowVeloTick && !player.timerStopped && !server.isDebug) {
+        // Handle disallow noclip
+        if (!player.timerStopped && !server.isDebug) {
             server.sendCommand(`noclip 0; sv_autobunnyhopping 0; sv_jump_spam_penalty_time ${nerdStuff.oneTick}; sv_staminalandcost 0.05; sv_airaccelerate 12; sv_air_max_wishspeed 30; sv_noclipspeed 0`);
         }
 
@@ -291,14 +279,14 @@ let server = {
         }
 
         //player.playerPos = Instance.GetEntityOrigin(Instance.GetPlayerPawn(0));
-        player.playerPos = Instance.GetPlayerController(0)?.GetPlayerPawn()?.GetAbsOrigin();
+        player.playerPos = player.playerController?.GetPlayerPawn()?.GetAbsOrigin();
 
         if (player.oldPlayerPos.x !== player.playerPos.x || player.oldPlayerPos.y !== player.playerPos.y || player.oldPlayerPos.z !== player.playerPos.z) {
             player.lastStoodStill = server.currentTick;
             //if (!player.timerStopped) Instance.Msg(`${player.currentStage}: ${player.playerPos.x} ${player.playerPos.y} ${player.playerPos.z}`);
         }
 
-        player.playerVel = utils.calculateVelocity(player.oldPlayerPos, player.playerPos);
+        player.playerVel = ('000000' + utils.get2DVelocity().toFixed(2)).slice(-6);
         if (player.allowTrail && player.timerStopped && hud.trailColorIndex !== 0) {
             player.spawnTrail();
         }
@@ -655,8 +643,8 @@ let server = {
 
         if (player.checkpoints.pos.x !== 0 || player.checkpoints.pos.y !== 0 || player.checkpoints.pos.z !== 0) {
             player.resetVelo();
-            
-            Instance.GetPlayerController(0)?.GetPlayerPawn()?.Teleport(
+
+            player.playerController?.GetPlayerPawn()?.Teleport(
                 player.checkpoints.pos,
                 player.checkpoints.ang,
                 { x: 0, y: 0, z: 0 }
@@ -694,7 +682,7 @@ let server = {
         }
 
         player.checkpoints.pos = player.playerPos;
-        player.checkpoints.ang = Instance.GetPlayerController(0)?.GetPlayerPawn()?.GetEyeAngles();
+        player.checkpoints.ang = player.playerController?.GetPlayerPawn()?.GetEyeAngles();
 
         Instance.Msg(`${player.checkpoints.pos.x}, ${player.checkpoints.pos.y}, ${player.checkpoints.pos.z}`);
         Instance.Msg(`${player.checkpoints.ang.pitch}, ${player.checkpoints.ang.yaw}, ${player.checkpoints.ang.roll}`);
@@ -967,6 +955,7 @@ let hud = {
 };
 
 let player = {
+    playerController: null,
     currentMode: "FreeRoam",
     timerStopped: true,
     timerTicks: 0,
@@ -1006,9 +995,11 @@ let player = {
     radioDisabled: false,
 
     resetVelo: function () {
-        server.disallowVeloTick = server.currentTick + 1;
-        server.allowVeloTick = server.currentTick + 17;
-        server.sendCommand("duck -999 0 0");
+        player.playerController.GetPlayerPawn()?.Teleport(
+            null,
+            null,
+            { x: 0, y: 0, z: 0 }
+        );
     },
 
     respawn: function (noTp = false, fromRestart = false) {
@@ -1029,10 +1020,6 @@ let player = {
             player.currentMode = "FreeRoam";
 
             if (!server.playerSpawnedIn) {
-                //server.sendCommand("ent_create prop_dynamic {targetname custom_player_model model characters/models/oylsister/etc/deltaflair/deltaflair.vmdl}");
-                //server.sendCommand("ent_fire custom_player_model followentity !player 1");
-                //server.entFire("!player", "alpha", "0", nerdStuff.oneTick * 3);
-
                 server.sendChatColored(`${chatcolors.brightgreen}Loaded ${chatcolors.orange}${server.currentMapName}`, 1);
                 server.sendChatColored(`${chatcolors.brightgreen}Available modes:${config.mapInfo[server.currentMapName].hasFrenzy ? `${chatcolors.silver} Happy Frenzy${chatcolors.brightgreen},` : ""}${config.mapInfo[server.currentMapName].hasTimeTrial ? `${chatcolors.silver} Time Trial${chatcolors.brightgreen},` : ""}${chatcolors.silver} Free Roam`, 1);
                 server.sendChatColored(`${chatcolors.brightgreen}Please choose one of those modes now.`, 2);
@@ -1156,14 +1143,11 @@ const utils = {
         return `${sign}${minutes}:${('00' + seconds.toString()).slice(-2)}.${millisStr}`;
     },
 
-    calculateVelocity: function (oldPos, newPos) {
-        if (oldPos === nerdStuff.nullV || newPos === nerdStuff.nullV) {
-            return "000.00";
-        }
-        const velocityX = (newPos.x - oldPos.x) * 64;
-        const velocityY = (newPos.y - oldPos.y) * 64;
-        const velocity2D = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
-        return ('000000' + velocity2D.toFixed(2)).slice(-6);
+    get2DVelocity: function () {
+        const playerPawn = player.playerController.GetPlayerPawn();
+        const vel = playerPawn.GetAbsVelocity();
+        const vel2D = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
+        return vel2D;
     },
 
     generateRandomHash: function (length = 8) {
@@ -1189,6 +1173,10 @@ Instance.OnScriptInput("on_every_fourth_tick", () => {
     // Update HUD
     if (Instance.IsWarmupPeriod() === true) return;
     hud.printCenterHud();
+});
+
+Instance.OnGameEvent("player_activate", (event) => {
+    player.playerController = Instance.GetPlayerController(event.userid);
 });
 
 Instance.OnScriptInput("on_spawn", () => {
@@ -1349,6 +1337,7 @@ Instance.OnScriptInput("broken", () => {
     server.sendChatColored(`${chatcolors.silver}This feature is currently broken... out of service :p blame evil valve`);
 });
 
+// placeholder
 const guideTrails = {
     "some_map": {
         "1": [
