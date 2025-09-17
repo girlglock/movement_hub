@@ -1,0 +1,7 @@
+{
+    "compilerOptions": {
+        "strict": false,
+        "checkJs": true,
+        "noEmit": true
+    }
+}
