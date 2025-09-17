@@ -11,12 +11,14 @@ declare module "cs_script/point_script"
         Msg(text: string): void;
         /** Print some text to the game window. */
         DebugScreenText(text: string, x: number, y: number, duration: number, color: Color): void;
-
+        /**Draw a debug sphere (?) */
+        DebugSphere(center: Vector, color: Color, a: number, rad: number, ztest: boolean, duration: number): void;
+        /** Trace a ray (?)*/
+        GetTraceHit(parameters: any): void;
         /** Called in Tools mode before the script is reloaded due to changes. A returned value will be passed to the OnReload callback. */
         OnBeforeReload(callback: () => any): void;
         /** Called in Tools mode after the script reloaded due to changes while. */
         OnReload(callback: (memory: any) => void): void;
-
         /** Called when the point_script entity is activated */
         OnActivate(callback: () => void): void;
         /** Called when known game events are fired. See GameEventDefs for list of known game events. */
@@ -27,7 +29,6 @@ declare module "cs_script/point_script"
         SetThink(callback: () => void): void;
         /** Set when the think callback should next be called */
         SetNextThink(time: number): void;
-
         /** Fire the input on all targets matching the specified name. */
         EntFireAtName(name: string, input: string, value?: EntIOValue, delay?: number): void;
         /** Fire the input on the specified target. */
@@ -36,7 +37,6 @@ declare module "cs_script/point_script"
         ConnectOutput(target: Entity, output: string, callback: (arg: EntIOValue, context: EntIOContext) => any): number | undefined;
         /** Find entities by name. */
         DisconnectOutput(connectionId: number): void;
-
         /** Find the first entity matching the specified name. */
         FindEntityByName(name: string): Entity | undefined;
         /** Find entities matching the specified name. */
@@ -47,7 +47,6 @@ declare module "cs_script/point_script"
         FindEntitiesByClass(className: string): Entity[];
         /** Get the player controller in the given slot. */
         GetPlayerController(slot: number): CSPlayerController | undefined;
-
         /** Get the game time in seconds. */
         GetGameTime(): number;
         /** Get if the game is currently in a Warmup period. */
@@ -60,7 +59,6 @@ declare module "cs_script/point_script"
         GetMapName(): string;
         /** Get the number of rounds played in the current game. */
         GetRoundsPlayed(): number;
-
         /** Issue the specified command to the specified client. */
         ClientCommand(slot: number, command: string): void;
         /** Issue a command. */
