@@ -60,14 +60,15 @@ const defaultMapInfo = {
 
 const config = {
     sounds: {
-        levelDown: "/sounds/ui/armsrace_level_down",
-        levelUp: "/sounds/ui/xp_levelup",
-        beepSound: "sounds/buttons/button9",
-        errorSound: "sounds/buttons/button8",
-        yippi2: "sounds/ui/coin_pickup_01",
-        yippi: "sounds/psp1g/yippie",
-        laugh: "sounds/fire2k/laugh",
-        requestMove: "/sounds/vo/agents/swat_fem/request_move_",
+        levelDown: "UI.ArmsRace.Demoted",
+        levelUp: "UI.XP.LevelUp",
+        beepSound: "Buttons.snd9",
+        errorSound: "Buttons.snd8",
+        yippi2: "UI.CoinLevelUp",
+        yippi: "psp1g.yippie",
+        laugh: "fire2k.laugh",
+        requestMove: " swat_fem.request_move_",
+        ticker: "UIPanorama.XP.Ticker"
     },
 
     mapInfo: {
@@ -280,7 +281,11 @@ class HUD {
 
     printCenterHud() {
         if (server.currentTick - player.lastStoodStill <= 16) {
-            if (player.currentMode === "HappyFrenzy") {
+            if(player.currentMode === "FreeRoam" && player.timerStopped && player.isRewinding) {
+                this.createHudHint(`Rewinding...\rPress 6 to cancel`);
+                this.centerHudCount++;
+            }
+            else if (player.currentMode === "HappyFrenzy") {
                 this.createHudHint(`${!player.timerStopped ? `Time: ${Utils.formatTime(player.timerTicks)}\rSteamhappies: ${player.steamhappies}/${config.mapInfo[server.currentMapName].steamHappies}` : ""}`);
                 this.centerHudCount++;
             }
@@ -423,7 +428,7 @@ class HUD {
         this.showHudHint();
     }
 
-    showHudHint() { 
+    showHudHint() {
         Instance.EntFireAtName("sv", "Command", `ent_fire hudDisplay showhudhint`, 0);
     }
 
@@ -510,6 +515,178 @@ class Player {
         this.playerAngle = { pitch: 0, yaw: 0, roll: 0 };
         this.bbox = false;
         this.radioDisabled = false;
+
+        this.rewindFrames = [];
+        this.maxRewindFrames = 640;
+        this.currentRewindIndex = 0;
+        this.rewindFrameCount = 0;
+        this.isRewinding = false;
+        this.rewindPlaybackIndex = 0;
+    }
+
+    addRewindFrame(pos, ang, velo) {
+        const frame = {
+            pos: { ...pos },
+            ang: { ...ang },
+            velo: velo
+        };
+
+        if (this.rewindFrameCount < this.maxRewindFrames) {
+            this.rewindFrames[this.currentRewindIndex] = frame;
+            this.rewindFrameCount++;
+        } else {
+            this.rewindFrames[this.currentRewindIndex] = frame;
+        }
+
+        this.currentRewindIndex = (this.currentRewindIndex + 1) % this.maxRewindFrames;
+    }
+
+    getRewindFrame(index) {
+        if (index < 0 || index >= this.rewindFrameCount) {
+            return null;
+        }
+
+        let actualIndex;
+        if (this.rewindFrameCount < this.maxRewindFrames) {
+            if (this.currentRewindIndex <= this.rewindFrameCount) {
+                actualIndex = this.rewindFrameCount - 1 - index;
+            } else {
+                actualIndex = this.currentRewindIndex - 1 - index;
+                if (actualIndex < 0) {
+                    return null;
+                }
+            }
+        } else {
+            actualIndex = (this.currentRewindIndex - 1 - index + this.maxRewindFrames) % this.maxRewindFrames;
+        }
+
+        return this.rewindFrames[actualIndex];
+    }
+
+    getRewindFrameCount() {
+        return this.rewindFrameCount;
+    }
+
+    clearRewindFrames() {
+        this.rewindFrames = [];
+        this.currentRewindIndex = 0;
+        this.rewindFrameCount = 0;
+        this.isRewinding = false;
+        this.rewindPlaybackIndex = 0;
+    }
+
+    clearRewindedFrames() {
+        if (this.rewindPlaybackIndex > 0) {
+            const framesToKeep = this.rewindFrameCount - this.rewindPlaybackIndex;
+
+            if (framesToKeep > 0) {
+                const newFrames = new Array(this.maxRewindFrames);
+                for (let i = 0; i < framesToKeep; i++) {
+                    const frameIndex = this.rewindPlaybackIndex + i;
+                    const frame = this.getRewindFrame(frameIndex);
+                    if (frame) {
+                        newFrames[framesToKeep - 1 - i] = frame;
+                    }
+                }
+
+                this.rewindFrames = newFrames;
+                this.rewindFrameCount = framesToKeep;
+                this.currentRewindIndex = framesToKeep;
+            } else {
+                this.clearRewindFrames();
+                return;
+            }
+        }
+
+        this.isRewinding = false;
+        this.rewindPlaybackIndex = 0;
+    }
+
+    startRewind() {
+        if (this.rewindFrameCount > 0) {
+            this.isRewinding = true;
+            this.rewindPlaybackIndex = 0;
+        }
+    }
+
+    stopRewind() {
+        if (this.isRewinding && this.rewindPlaybackIndex > 0) {
+            const currentFrame = this.getRewindFrame(this.rewindPlaybackIndex - 1);
+            if (currentFrame) {
+                const playerPawn = Instance.GetPlayerController(0)?.GetPlayerPawn();
+                if (playerPawn) {
+                    playerPawn.Teleport(
+                        currentFrame.pos,
+                        null,
+                        currentFrame.velo
+                    );
+                    server.sendCommand(`setang ${currentFrame.ang.pitch} ${currentFrame.ang.yaw} ${currentFrame.ang.roll}`);
+                }
+            }
+        }
+
+        this.clearRewindedFrames();
+    }
+
+    handleRewindStop() {
+        if (!this.isRewinding && this.rewindPlaybackIndex > 0) {
+            const currentFrame = this.getRewindFrame(this.rewindPlaybackIndex - 1);
+            if (currentFrame) {
+                const playerPawn = Instance.GetPlayerController(0)?.GetPlayerPawn();
+                if (playerPawn) {
+                    playerPawn.Teleport(
+                        currentFrame.pos,
+                        null,
+                        currentFrame.velo
+                    );
+                    server.sendCommand(`setang ${currentFrame.ang.pitch} ${currentFrame.ang.yaw} ${currentFrame.ang.roll}`);
+                }
+            }
+
+            this.clearRewindedFrames();
+        }
+    }
+
+    processRewind() {
+        if (!this.isRewinding || this.rewindPlaybackIndex >= this.rewindFrameCount) {
+            if (this.rewindPlaybackIndex > 0) {
+                const lastFrame = this.getRewindFrame(this.rewindFrameCount - 1);
+                if (lastFrame) {
+                    const playerPawn = Instance.GetPlayerController(0)?.GetPlayerPawn();
+                    if (playerPawn) {
+                        playerPawn.Teleport(
+                            lastFrame.pos,
+                            null,
+                            lastFrame.velo
+                        );
+                        server.sendCommand(`setang ${lastFrame.ang.pitch} ${lastFrame.ang.yaw} ${lastFrame.ang.roll}`);
+                        server.playSound(config.sounds.ticker);
+                    }
+                }
+            }
+            this.stopRewind();
+            return false;
+        }
+
+        const rFrame = this.getRewindFrame(this.rewindPlaybackIndex);
+        if (rFrame) {
+            Instance.GetPlayerController(0)?.GetPlayerPawn()?.Teleport(
+                rFrame.pos,
+                null,
+                { x: 0, y: 0, z: 0 }
+            );
+
+            server.sendCommand(`setang ${rFrame.ang.pitch} ${rFrame.ang.yaw} ${rFrame.ang.roll}`);
+            if (this.rewindPlaybackIndex % 4 === 0) {
+                server.playSound(config.sounds.ticker);
+            }
+
+            this.rewindPlaybackIndex++;
+            return true;
+        }
+
+        this.stopRewind();
+        return false;
     }
 
     resetVelo() {
@@ -562,6 +739,8 @@ class Player {
         if (!fromRestart) {
             server.sendCommand(`stopsound`);
         }
+
+        this.clearRewindFrames();
     }
 
     spawnTrail() {
@@ -614,7 +793,7 @@ class Server {
         this.trailDuration = 3;
     }
 
-    sendCommand(message, delay = 0) { 
+    sendCommand(message, delay = 0) {
         Instance.EntFireAtName("sv", "Command", `${message}`, delay);
     }
 
@@ -634,11 +813,12 @@ class Server {
         this.lastChatMessageTick = this.currentTick;
     }
 
-    playSound(message, delay = 0) { 
-        Instance.EntFireAtName("sv", "Command", `play ${message}`, delay);
+    playSound(message, delay = 0) {
+        //Instance.EntFireAtName("sv", "Command", `play ${message}`, delay);
+        Instance.EntFireAtName("sv", "Command", `snd_sos_start_soundevent_at_pos ${message} ${player.playerPos.x} ${player.playerPos.y} ${player.playerPos.z}`, delay);
     }
 
-    entFire(targetname, key, value = "", delay = 0) { 
+    entFire(targetname, key, value = "", delay = 0) {
         Instance.EntFireAtName(targetname, key, value, delay);
     }
 
@@ -650,6 +830,7 @@ class Server {
 
     onTick() {
         this.currentTick++;
+        const playerController = Instance.GetPlayerController(0);
 
         // Handle first Spawn
         if (!this.firstSetup && this.currentTick > 175) {
@@ -678,7 +859,7 @@ class Server {
             }
 
             Instance.SetThink(() => {
-                Instance.GetPlayerController(0).JoinTeam(2);
+                playerController.JoinTeam(2);
                 this.sendCommand("ent_fire loadscreen destroyimmediately", nerdStuff.oneTick * 10);
             });
             Instance.SetNextThink(Instance.GetGameTime() + nerdStuff.oneTick * 10);
@@ -746,7 +927,7 @@ class Server {
             player.lastJumpHeights.push(Utils.calculateHeightDifference(player.playerJumpedPos, player.playerPos));
         }
 
-        player.playerPos = Instance.GetPlayerController(0)?.GetPlayerPawn()?.GetAbsOrigin();
+        player.playerPos = playerController?.GetPlayerPawn()?.GetAbsOrigin();
 
         if (player.oldPlayerPos.x !== player.playerPos.x || player.oldPlayerPos.y !== player.playerPos.y || player.oldPlayerPos.z !== player.playerPos.z) {
             player.lastStoodStill = this.currentTick;
@@ -758,6 +939,19 @@ class Server {
         }
 
         player.oldPlayerPos = player.playerPos;
+
+        // Handle Rewind
+        if (player.currentMode === "FreeRoam" && player.timerStopped && !player.checkpoints.locked) {
+            if (!player.isRewinding) {
+                player.handleRewindStop();
+                player.addRewindFrame(player.playerPos, playerController?.GetPlayerPawn()?.GetEyeAngles(), playerController?.GetPlayerPawn()?.GetAbsVelocity());
+            } else {
+                const rewindActive = player.processRewind();
+                if (!rewindActive) {
+                    player.clearRewindedFrames();
+                }
+            }
+        }
 
         // Update HUD
         hud.printHud();
@@ -1109,7 +1303,7 @@ class Server {
             return;
         }
 
-        if (player.checkpoints.pos.x !== 0 || player.checkpoints.pos.y !== 0 || player.checkpoints.pos.z !== 0) {
+        if (player.checkpoints.pos !== nerdStuff.nullV) {
             player.resetVelo();
 
             Instance.GetPlayerController(0)?.GetPlayerPawn()?.Teleport(
@@ -1173,13 +1367,12 @@ class Server {
     }
 }
 
-// Initialize instances
 const server = new Server();
 const hud = new HUD();
 const player = new Player();
 
-  /////////////////////////////////////////////////
- //       I HATE VALVE AND YOU SHOULD TOO       //
+/////////////////////////////////////////////////
+//       I HATE VALVE AND YOU SHOULD TOO       //
 ////////////////////////////////////////////////
 
 Instance.OnScriptInput("on_tick", () => {
@@ -1297,6 +1490,15 @@ Instance.OnScriptInput("on_free_roam", () => {
 Instance.OnScriptInput("kz_back_to_hub", () => {
     if (Instance.IsWarmupPeriod() === true) return;
     server.onBackToHub();
+});
+
+Instance.OnScriptInput("rewind_toggle", () => {
+    if (Instance.IsWarmupPeriod() === true) return;
+    if (player.checkpoints.locked) {
+        player.isRewinding = false;
+        return;
+    }
+    player.isRewinding = !player.isRewinding;
 });
 
 Instance.OnScriptInput("on_trial_loaded_nuke", () => {
