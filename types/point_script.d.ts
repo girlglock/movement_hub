@@ -11,14 +11,14 @@ declare module "cs_script/point_script"
         Msg(text: string): void;
         /** Print some text to the game window. */
         DebugScreenText(text: string, x: number, y: number, duration: number, color: Color): void;
-        /**Draw a debug sphere (?) */
-        DebugSphere(center: Vector, color: Color, a: number, rad: number, ztest: boolean, duration: number): void;
-        /** Trace a ray (?)*/
-        GetTraceHit(parameters: any): void;
+        /** Draw a wire spehere in the world. */
+        DebugSphere(center: Vector, radius: number, duration: number, color: Color): void;
+
         /** Called in Tools mode before the script is reloaded due to changes. A returned value will be passed to the OnReload callback. */
         OnBeforeReload(callback: () => any): void;
         /** Called in Tools mode after the script reloaded due to changes while. */
         OnReload(callback: (memory: any) => void): void;
+
         /** Called when the point_script entity is activated */
         OnActivate(callback: () => void): void;
         /** Called when known game events are fired. See GameEventDefs for list of known game events. */
@@ -29,14 +29,16 @@ declare module "cs_script/point_script"
         SetThink(callback: () => void): void;
         /** Set when the think callback should next be called */
         SetNextThink(time: number): void;
+
         /** Fire the input on all targets matching the specified name. */
         EntFireAtName(name: string, input: string, value?: EntIOValue, delay?: number): void;
         /** Fire the input on the specified target. */
-        EntFireAtHandle(target: Entity, input: string, value?: EntIOValue, delay?: number): void;
+        EntFireAtTarget(target: Entity, input: string, value?: EntIOValue, delay?: number): void;
         /** Connect the output of an entity to a callback. The return value is a connection id that can be used in `DisconnectOutput` */
         ConnectOutput(target: Entity, output: string, callback: (arg: EntIOValue, context: EntIOContext) => any): number | undefined;
         /** Find entities by name. */
         DisconnectOutput(connectionId: number): void;
+
         /** Find the first entity matching the specified name. */
         FindEntityByName(name: string): Entity | undefined;
         /** Find entities matching the specified name. */
@@ -47,6 +49,10 @@ declare module "cs_script/point_script"
         FindEntitiesByClass(className: string): Entity[];
         /** Get the player controller in the given slot. */
         GetPlayerController(slot: number): CSPlayerController | undefined;
+
+        /** Trace along a line and detect collisions */
+        GetTraceHit(start: Vector, end: Vector, config?: TraceConfig): TraceResult;
+
         /** Get the game time in seconds. */
         GetGameTime(): number;
         /** Get if the game is currently in a Warmup period. */
@@ -59,6 +65,7 @@ declare module "cs_script/point_script"
         GetMapName(): string;
         /** Get the number of rounds played in the current game. */
         GetRoundsPlayed(): number;
+
         /** Issue the specified command to the specified client. */
         ClientCommand(slot: number, command: string): void;
         /** Issue a command. */
@@ -69,7 +76,18 @@ declare module "cs_script/point_script"
     type QAngle = { pitch: number, yaw: number, roll: number };
     type Color = { r: number, g: number, b: number, a?: number };
     type EntIOValue = boolean | number | string | Vector | Color | undefined;
-    type EntIOContext = { activator: Entity, caller: Entity };
+    type EntIOContext = { caller?: Entity, activator?: Entity  };
+    interface TraceConfig {
+        ignoreEnt?: Entity, // Set to ignore collisions with an entity, typically the source of a trace
+        interacts?: TraceInteracts, // Defaults to trace against any solid
+        sphereRadius?: number; // Set to trace a sphere with specified radius
+    }
+    interface TraceResult {
+        fraction: number;
+        end: Vector;
+        didHit: boolean;
+        hitEnt?: Entity | null;
+    }
 
     enum CSWeaponType {
         KNIFE = 0,
@@ -94,6 +112,12 @@ declare module "cs_script/point_script"
         KNIFE = 2,
         GRENADES = 3,
         C4 = 4
+    }
+
+    enum TraceInteracts {
+        SOLID = 0,
+        WORLD = 1
+        
     }
 
     interface GameEventDefs {
