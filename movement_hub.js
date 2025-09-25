@@ -715,9 +715,8 @@ class Player {
             this.currentMode = "FreeRoam";
 
             if (!server.playerSpawnedIn) {
-                server.sendChatColored(`${chatcolors.brightgreen}Loaded ${chatcolors.orange}${server.currentMapName}`, 1);
-                server.sendChatColored(`${chatcolors.brightgreen}Available modes:${config.mapInfo[server.currentMapName].hasFrenzy ? `${chatcolors.silver} Happy Frenzy${chatcolors.brightgreen},` : ""}${config.mapInfo[server.currentMapName].hasTimeTrial ? `${chatcolors.silver} Time Trial${chatcolors.brightgreen},` : ""}${chatcolors.silver} Free Roam`, 1);
-                server.sendChatColored(`${chatcolors.brightgreen}Please choose one of those modes now.`, 2);
+                server.sendChatColored(`Loaded ${server.currentMapName}\u2029Available modes:${config.mapInfo[server.currentMapName].hasFrenzy ? ` Happy Frenzy,` : ""}${config.mapInfo[server.currentMapName].hasTimeTrial ? ` Time Trial,` : ""} Free Roam\u2029Please choose one of those modes now.`, 1);
+                server.sendChatColored("Commands: !bbox, !r, !tp, !cp, !talon, !bayonet, !butterfly, !m9, !karambit, !buttplugs, !survival, !huntsman, !classic, !ursus, !skeleton, !flip, !bowie, !gut", 1);
                 server.entFire("loadscreen", "destroyimmediately");
             }
             server.playerSpawnedIn ||= true;
@@ -835,7 +834,7 @@ class Server {
         // Handle first Spawn
         if (!this.firstSetup && this.currentTick > 175) {
             this.randomHashPW = Utils.generateRandomHash().toString();
-            this.sendCommand(`sv_radio_throttle_window 0; sv_disable_teamselect_menu 0; snd_toolvolume 0.025; noclip_fixup 0;game_alias comp;`);
+            this.sendCommand(`sv_radio_throttle_window 0; sv_disable_teamselect_menu 0; snd_toolvolume 0.025; noclip_fixup 0;game_alias comp;sv_subtick_movement_view_angles 0`);
 
             this.entFire("end_s*", "addoutput", `OnStartTouch>kz_script>RunScriptInput>on_trial_stage_finish>0>-1`);
             this.entFire("collected_s*", "addoutput", `OnStartTouch>kz_script>RunScriptInput>on_trial_alt_collect>0>-1`);
@@ -868,7 +867,7 @@ class Server {
 
         // Handle disallow noclip
         if (!player.timerStopped && !this.isDebug) {
-            this.sendCommand(`noclip 0; sv_autobunnyhopping 0; sv_jump_spam_penalty_time ${nerdStuff.oneTick}; sv_staminalandcost 0.05; sv_airaccelerate 12; sv_air_max_wishspeed 30; sv_noclipspeed 0`);
+            this.sendCommand(`noclip 0; sv_autobunnyhopping 0; sv_jump_spam_penalty_time ${nerdStuff.oneTick}; sv_staminalandcost 0.05; sv_airaccelerate 12; sv_air_max_wishspeed 30;`);
         }
 
         // Handle Radio
@@ -1371,9 +1370,120 @@ const server = new Server();
 const hud = new HUD();
 const player = new Player();
 
-/////////////////////////////////////////////////
-//       I HATE VALVE AND YOU SHOULD TOO       //
-////////////////////////////////////////////////
+///////////////////////////////////////////////////
+//       I HATE VALVE AND YOU SHOULD TOO        //
+//       IM GOING TO WISH                      //
+//              THEM AN AMAZING CHRISTMAS     //
+///////////////////////////////////////////////
+
+Instance.OnPlayerChat((speaker, team, text) => {
+    switch (true) {
+        case text === "!trail":
+            server.sendChatColored(`Usage: !trail <duration in seconds>`);
+            break;
+
+        case /^!trail \d+$/.test(text): {
+            const duration = parseInt(text.split(" ")[1], 10);
+            server.trailDuration = duration;
+            server.sendChatColored(`Trail duration set to ${duration} seconds!`);
+            break;
+        }
+
+        case text === "!bbox":
+            server.bbox();
+            break;
+
+        case text === "!r":
+            server.onBackToHub();
+            break;
+
+        case text === "!tp":
+            server.kzTeleport();
+            break;
+
+        case text === "!cp":
+            server.kzCheckpoint();
+            break;
+
+        case text === "!help":
+            server.sendChat("Commands: !bbox, !r, !tp, !cp, !talon, !bayonet, !butterfly, !m9, !karambit, !buttplugs, !survival, !huntsman, !classic, !ursus, !skeleton, !flip, !bowie, !gut");
+            break;
+
+        case text === "!talon":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(523);
+            break;
+
+        case text === "!bayonet":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(500);
+            break;
+
+        case text === "!butterfly":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(515);
+            break;
+
+        case text === "!m9":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(508);
+            break;
+
+        case text === "!karambit":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(507);
+            break;
+
+        case text === "!buttplugs":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(516);
+            break;
+
+        case text === "!survival":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(518);
+            break;
+
+        case text === "!huntsman":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(509);
+            break;
+
+        case text === "!classic":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(503);
+            break;
+
+        case text === "!ursus":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(519);
+            break;
+
+        case text === "!skeleton":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(525);
+            break;
+
+        case text === "!flip":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(505);
+            break;
+
+        case text === "!bowie":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(514);
+            break;
+
+        case text === "!gut":
+            if (Instance.IsWarmupPeriod()) return;
+            player.giveSubclass(506);
+            break;
+
+        default:
+            break;
+    }
+});
+
 
 Instance.OnScriptInput("on_tick", () => {
     if (Instance.IsWarmupPeriod() === true) return;
@@ -1391,22 +1501,22 @@ Instance.OnScriptInput("on_spawn", () => {
     player.respawn();
 });
 
-Instance.OnScriptInput("on_round_start", () => {
+Instance.OnRoundStart(() => {
     if (Instance.IsWarmupPeriod() === true) return;
     server.onRoundStart();
 });
 
-Instance.OnScriptInput("on_jump", () => {
+Instance.OnScriptInput("player_jump", () => {
     if (Instance.IsWarmupPeriod() === true) return;
     server.onJump();
 });
 
-Instance.OnScriptInput("on_sound", () => {
+Instance.OnScriptInput("player_sound", (args) => {
     if (Instance.IsWarmupPeriod() === true) return;
     server.onSound();
 });
 
-Instance.OnScriptInput("on_weapon", () => {
+Instance.OnGunFire((weapon) => {
     if (Instance.IsWarmupPeriod() === true) return;
     server.weaponFiredTick = server.currentTick;
 });
